@@ -1,0 +1,52 @@
+services:
+  imgcompress:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: karimz1/imgcompress:local-test
+    healthcheck:
+      test: ["CMD", "python", "/container/healthcheck.py"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+
+  test-runner:
+    build:
+      context: .devcontainer
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    environment:
+      - PLAYWRIGHT_BASE_URL=http://imgcompress:5000
+    depends_on:
+      imgcompress:
+        condition: service_healthy
+    command:
+      - "-c"
+      - |
+        export PATH="/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$$(/usr/bin/find /root/.nvm/versions/node -maxdepth 1 -type d -name 'v*' | head -n 1)/bin"
+        
+        # Ensure directories created by python tests are writable by container's nonroot user
+        umask 000
+        
+        cat << 'EOF' > /usr/local/bin/docker
+        #!/bin/sh
+        if [ "$$1" = "build" ] || [ "$$1" = "buildx" ]; then
+            echo "[Mock] Skipping docker build as it is handled by docker-compose"
+            exit 0
+        fi
+        exec /usr/bin/docker "$$@"
+        EOF
+        chmod +x /usr/local/bin/docker
+        
+        echo '====================================='
+        echo '  Running Docker Integration Tests'
+        echo '====================================='
+        ./runIntegrationTests.sh
+        # echo '====================================='
+        # echo '  Running Playwright E2E Tests'
+        # echo '====================================='
+        # ./run-e2e.sh
