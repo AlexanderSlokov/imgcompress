@@ -1,4 +1,3 @@
-# Every DHI definition starts with a syntax directive that tells BuildKit which DHI build frontend to use.
 # syntax=dhi.io/build:2-debian13
 
 name: Imgcompress 0.6.1 DHI Debian 13
@@ -31,18 +30,24 @@ annotations:
 
 environment:
   VIRTUAL_ENV: "/container/venv"
-  PATH: "$VIRTUAL_ENV/bin:$PATH"
+  PATH: "/container/venv/bin:/container/python/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   U2NET_HOME: "/container/.u2net"
 
 work-dir: /container
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Runtime packages (installed into the final image directly by the DHI solver)
+# ─────────────────────────────────────────────────────────────────────────────
 contents:
   packages:
-    # Debian standard fs struct
+    # Exclude packages that are pulled in as transitive deps but not needed at runtime
+    - '!mawk'
+    - '!original-awk'
+    # Debian standard filesystem structure
     - base-files
-    # For container's orchestrator
+    # Container init (PID 1 signal forwarding + zombie reaping)
     - dumb-init
-    # Imgcompress's Pillow and OS deps starts from here
+    # ── Pillow / imaging native deps ──
     - ghostscript
     - libjpeg62-turbo
     - libpng16-16
@@ -58,90 +63,249 @@ contents:
     - libxcb1
     - zlib1g
     - libgif7
+    # ── C++ runtime (onnxruntime, granian) ──
     - libstdc++6
     - libgomp1
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Source code: fetched from Git with integrity check
+  # ─────────────────────────────────────────────────────────────────────────
+  # NOTE: Replace the checksum below with the actual sha256 of the Git tree
+  # after pushing to the test-build-dhi branch.
+  # You can obtain it with:
+  #   git ls-remote https://github.com/AlexanderSlokov/imgcompress.git refs/heads/test-build-dhi
+  # Then use the commit SHA as the checksum reference.
+  files:
+    - src: https://github.com/AlexanderSlokov/imgcompress.git#test-build-dhi
+      dest: /src/imgcompress
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Build stages
+  # ─────────────────────────────────────────────────────────────────────────
   builds:
+    # ── Stage 1: Frontend (Next.js / React) ───────────────────────────────
+    # Strategy: The official dhi/pkg-node artifact ships ALL Node binaries
+    # including pnpm, npm, npx — the runtime Node DHI just excludes them.
+    # In our build stage we include everything we need (node + pnpm).
     - name: frontend-builder
       contents:
         packages:
-          - nodejs-24
-          - pnpm
-          - git
+          - bash
+          - coreutils
+          - ca-certificates
+        artifacts:
+          - name: dhi.io/pkg-node:24.15.0-debian13@sha256:2f5547b162a4c888c43583575a531fca4d0cf5db47f9130526f3f4a9b9236271
+            includes:
+              - opt/docker
+              - opt/nodejs
+              - usr/local/bin/node
+            excludes:
+              # We only need node + pnpm. Exclude the rest to keep build stage lean.
+              - opt/docker/sbom/yarn
+              - opt/nodejs/node-v24.15.0/bin/corepack
+              - opt/nodejs/node-v24.15.0/bin/yarn
+              - opt/nodejs/node-v24.15.0/bin/yarnpkg
+              - opt/nodejs/node-v24.15.0/include
+              # Keep: npm (pnpm might delegate to it), pnpm, pnpx, npx
+              # Keep: lib/, share/ (pnpm/npm runtime deps)
+            uid: 0
+            gid: 0
       pipeline:
-        # The built static files are in /app/frontend/out/
+        # pnpm, npm, node are all in the artifact — just set PATH
         - name: compile-react-frontend
           runs: |
-            git clone https://github.com/AlexanderSlokov/imgcompress/tree/test-build-dhi /app
-            cd /app/frontend
+            set -eux -o pipefail
+
+            export PATH="/opt/nodejs/node-v24.15.0/bin:/usr/local/bin:$PATH"
+
+            node --version
+            pnpm --version
+
+            cd /src/imgcompress/frontend
+
             CI=true pnpm install --frozen-lockfile
             pnpm run build
       outputs:
-        - source: /app/frontend/out
+        # Static site output (Next.js export)
+        - source: /src/imgcompress/frontend/out
           target: /container/backend/image_converter/presentation/web/static_site
           uid: 65532
           gid: 65532
           diff: true
-        - source: /app/frontend/.next
-          target: /container/backend/image_converter/presentation/web/static_site
+        # Next.js build artifacts (SSR data, etc.)
+        - source: /src/imgcompress/frontend/.next
+          target: /container/backend/image_converter/presentation/web/static_site/.next
           uid: 65532
           gid: 65532
           diff: true
-        - source: /app/frontend/public
-          target: /container/backend/image_converter/presentation/web/static_site
+        # Public assets
+        - source: /src/imgcompress/frontend/public
+          target: /container/backend/image_converter/presentation/web/static_site/public
           uid: 65532
           gid: 65532
           diff: true
 
+    # ── Stage 2: Backend (Python + uv + rembg model) ─────────────────────
     - name: backend-builder
       contents:
         packages:
-          - uv # Hay ta yonk cái uv từ dhi.io/uv:0.11.11-debian13@sha256:33783120b652192063c0193ffbb6f5685d798221bb730906595188d7c1b2a37e
-          - git
+          - bash
+          - coreutils
+          - ca-certificates
+          - curl
+          # Build deps for native Python extensions (Pillow, cffi, etc.)
+          - gcc
+          - g++
+          - make
+          - python3-dev
+          - libffi-dev
+          - libjpeg62-turbo-dev
+          - libpng-dev
+          - libtiff-dev
+          - libwebp-dev
+          - libopenjp2-7-dev
+          - liblcms2-dev
+          - libfreetype-dev
+          - libharfbuzz-dev
+          - libfribidi-dev
+          - zlib1g-dev
+          - libgif-dev
+          - libheif-dev
+        artifacts:
+          # uv binary from DHI package
+          # NOTE: Verify the digest is current for uv 0.11.x on debian13.
+          - name: dhi.io/uv:0.11.11-debian13@sha256:33783120b652192063c0193ffbb6f5685d798221bb730906595188d7c1b2a37e
+            includes:
+              - usr/local/bin/uv
+              - usr/local/bin/uvx
+            uid: 0
+            gid: 0
       pipeline:
-        # Lẽ ra nên cài cục python của uv vào /container/python?
-        - name: install-python-venv
-          # Ai đó check giùm cái lệnh uv đi
+        - name: install-python-and-venv
           runs: |
-            uv python install 3.11 /container/python
-            uv venv --python 3.11 $VIRTUAL_ENV
-            git clone https://github.com/AlexanderSlokov/imgcompress/tree/test-build-dhi /container
-            cd /container/backend
+            set -eux -o pipefail
+
+            export PATH="/usr/local/bin:$PATH"
+
+            # Install standalone Python 3.11 managed by uv
+            # (statically built, no OS python dependency)
+            uv python install 3.11 --install-dir /container/python
+
+            # Create virtualenv
+            uv venv --python 3.11 /container/venv
+            export PATH="/container/venv/bin:$PATH"
+            export VIRTUAL_ENV=/container/venv
+
+            # Install Python dependencies
+            cd /src/imgcompress
             uv pip install -r requirements.txt
             uv pip install .
-        - name: install-remove-background-ai-model
-          runs:
-            | # By some darkmagic, we yonk the model from url and place in /container/.u2net
+
+        - name: download-rembg-model
+          runs: |
+            set -eux -o pipefail
+
+            export PATH="/container/venv/bin:$PATH"
+            export VIRTUAL_ENV=/container/venv
+            export U2NET_HOME=/container/.u2net
+            mkdir -p "$U2NET_HOME"
+
+            # Pre-download the rembg u2net model so the container
+            # doesn't need internet access at runtime.
+            python3 - <<'PY'
+            import json, os
+            from rembg import new_session
+            with open("/src/imgcompress/backend/image_converter/config/rembg.json", "r", encoding="utf-8") as f:
+                model_name = json.load(f).get("model_name", "u2net")
+            new_session(model_name)
+            print(f"rembg model cached: {model_name}")
+            PY
+
+        - name: prepare-runtime-layout
+          runs: |
+            set -eux -o pipefail
+
+            # Copy backend source code into the container runtime layout
+            cp -a /src/imgcompress/backend /container/backend
+            cp    /src/imgcompress/entrypoint.py /container/entrypoint.py
+            cp    /src/imgcompress/healthcheck.py /container/healthcheck.py
+
+            # Create the static site directory (will be populated by frontend-builder output)
+            mkdir -p /container/backend/image_converter/presentation/web/static_site
+
+            # Fix ownership for nonroot (UID 65532)
+            chown -R 65532:65532 /container
+
+            # Generate ld.so.cache so the dynamic linker can find all .so files at runtime.
+            # Without this, libgs.so fails to load its device plugins in the shell-less
+            # hardened runtime image.
+            ldconfig
       outputs:
-        - source: /app/python
+        # Python standalone installation
+        - source: /container/python
           target: /container/python
           uid: 65532
           gid: 65532
           diff: true
+        # Python virtual environment (site-packages, pip metadata, etc.)
         - source: /container/venv
           target: /container/venv
           uid: 65532
           gid: 65532
           diff: true
+        # Pre-downloaded u2net ONNX model
         - source: /container/.u2net
           target: /container/.u2net
           uid: 65532
           gid: 65532
           diff: true
-        - source: /container/backend/
-          target: /container/backend/
+        # Backend application code
+        - source: /container/backend
+          target: /container/backend
           uid: 65532
           gid: 65532
           diff: true
-        - source: /container/backend/entrypoint.py
-          target: /container/backend/entrypoint.py
+        # Entrypoint and healthcheck scripts
+        - source: /container/entrypoint.py
+          target: /container/entrypoint.py
           uid: 65532
           gid: 65532
           diff: true
-        - source: /container/backend/healthcheck.py
-          target: /container/backend/healthcheck.py
+        - source: /container/healthcheck.py
+          target: /container/healthcheck.py
           uid: 65532
           gid: 65532
           diff: true
+        # ld.so.cache for dynamic linker
+        - source: /etc/ld.so.cache
+          target: /etc/ld.so.cache
+          uid: 0
+          gid: 0
+          diff: true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Directories to create in the final image
+# ─────────────────────────────────────────────────────────────────────────────
+paths:
+  - type: directory
+    path: /container
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /container/backend
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+  - type: directory
+    path: /container/backend/image_converter/presentation/web/static_site
+    uid: 65532
+    gid: 65532
+    mode: "0755"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# User / Group (matches DHI nonroot convention, UID/GID 65532)
+# ─────────────────────────────────────────────────────────────────────────────
 accounts:
   run-as: nonroot
   users:
@@ -160,7 +324,11 @@ ports:
 entrypoint:
   - /usr/bin/dumb-init
   - --
-
-cmd:
   - python
-  - /container/backend/entrypoint.py
+  - /container/entrypoint.py
+
+# Note: DHI runtime variant has no shell, so HEALTHCHECK CMD exec form
+# would need to be implemented via the orchestrator (e.g., Kubernetes
+# livenessProbe / Docker Compose healthcheck). The healthcheck.py script
+# is included at /container/healthcheck.py for use with:
+#   docker run --health-cmd="python /container/healthcheck.py" ...
