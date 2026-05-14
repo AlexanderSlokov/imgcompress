@@ -1,10 +1,10 @@
 REGISTRY ?= docker.io/karimz1
 IMAGE ?= imgcompress
 TAG ?= latest
-DHI_YAML_FILE ?= docker/image/0.7.0-dhi.yaml
+DHI_YAML_FILE ?= docker/image/0.6.1-dhi.yaml
 CLOUD_BUILDER=
 
-# Build image with sbom and provenance, 
+# Build image with sbom and provenance,
 # good for Docker Scout to indexing layers and attestation.
 DHI_build:
 	docker buildx build . -f $(DHI_YAML_FILE) \
@@ -14,7 +14,7 @@ DHI_build:
 	-t $(REGISTRY)/$(IMAGE):$(TAG)
 
 
-# Use Docker Hub Cloudbuild for faster build. 
+# Use Docker Hub Cloudbuild for faster build.
 # Need a Docker Hub account and must init a Cloud Builder first.
 DHI_cloud_build:
 	docker buildx build . -f $(DHI_YAML_FILE) \
@@ -24,7 +24,7 @@ DHI_cloud_build:
 	--provenance=1 \
 	-t $(REGISTRY)/$(IMAGE):$(TAG)
 
-# Call Trivy to scan image for vulnerabilites. 
+# Call Trivy to scan image for vulnerabilites.
 # It is a best practice to check the image after you build it.
 trivy:
 	docker run --rm -v \

@@ -1,0 +1,166 @@
+# Every DHI definition starts with a syntax directive that tells BuildKit which DHI build frontend to use.
+# syntax=dhi.io/build:2-debian13
+
+name: Imgcompress 0.6.1 DHI Debian 13
+image: thanhzeus2016/imgcompress:0.6.1-dhi-debian13
+variant: runtime
+tags:
+  - "0.6.1-dhi-debian13"
+platforms:
+  - linux/amd64
+  - linux/arm64
+
+os-release:
+  name: Docker Hardened Images (Debian)
+  id: debian
+  version-id: "13"
+  version-codename: trixie
+  pretty-name: Docker Hardened Images/Debian GNU/Linux 13 (trixie)
+  home-url: https://docker.com/products/hardened-images/
+  bug-report-url: https://docker.com/support/
+
+annotations:
+  org.opencontainers.image.authors: "Karim Zouine <mails.karimzouine@gmail.com>"
+  org.opencontainers.image.vendor: "Karim Zouine"
+  org.opencontainers.image.title: "imgcompress - High Performance Image Compression & Background Removal"
+  org.opencontainers.image.description: "Self-hosted, privacy-first tool for image compression, conversion (HEIC/WebP/PDF), and background removal using local AI. Supports 70+ formats."
+  org.opencontainers.image.url: "https://github.com/karimz1/imgcompress"
+  org.opencontainers.image.source: "https://github.com/karimz1/imgcompress"
+  org.opencontainers.image.documentation: "https://github.com/karimz1/imgcompress"
+  org.opencontainers.image.licenses: "GPL-3.0-or-later"
+
+environment:
+  VIRTUAL_ENV: "/container/venv"
+  PATH: "$VIRTUAL_ENV/bin:$PATH"
+  U2NET_HOME: "/container/.u2net"
+
+work-dir: /container
+
+contents:
+  packages:
+    # Debian standard fs struct
+    - base-files
+    # For container's orchestrator
+    - dumb-init
+    # Imgcompress's Pillow and OS deps starts from here
+    - ghostscript
+    - libjpeg62-turbo
+    - libpng16-16
+    - libtiff6
+    - libwebp7
+    - libopenjp2-7
+    - libimagequant0
+    - libheif1
+    - liblcms2-2
+    - libfreetype6
+    - libharfbuzz0b
+    - libfribidi0
+    - libxcb1
+    - zlib1g
+    - libgif7
+    - libstdc++6
+    - libgomp1
+  builds:
+    - name: frontend-builder
+      contents:
+        packages:
+          - nodejs-24
+          - pnpm
+          - git
+      pipeline:
+        # The built static files are in /app/frontend/out/
+        - name: compile-react-frontend
+          runs: |
+            git clone https://github.com/AlexanderSlokov/imgcompress/tree/test-build-dhi /app
+            cd /app/frontend
+            CI=true pnpm install --frozen-lockfile
+            pnpm run build
+      outputs:
+        - source: /app/frontend/out
+          target: /container/backend/image_converter/presentation/web/static_site
+          uid: 65532
+          gid: 65532
+          diff: true
+        - source: /app/frontend/.next
+          target: /container/backend/image_converter/presentation/web/static_site
+          uid: 65532
+          gid: 65532
+          diff: true
+        - source: /app/frontend/public
+          target: /container/backend/image_converter/presentation/web/static_site
+          uid: 65532
+          gid: 65532
+          diff: true
+
+    - name: backend-builder
+      contents:
+        packages:
+          - uv # Hay ta yonk cái uv từ dhi.io/uv:0.11.11-debian13@sha256:33783120b652192063c0193ffbb6f5685d798221bb730906595188d7c1b2a37e
+          - git
+      pipeline:
+        # Lẽ ra nên cài cục python của uv vào /container/python?
+        - name: install-python-venv
+          # Ai đó check giùm cái lệnh uv đi
+          runs: |
+            uv python install 3.11 /container/python
+            uv venv --python 3.11 $VIRTUAL_ENV
+            git clone https://github.com/AlexanderSlokov/imgcompress/tree/test-build-dhi /container
+            cd /container/backend
+            uv pip install -r requirements.txt
+            uv pip install .
+        - name: install-remove-background-ai-model
+          runs:
+            | # By some darkmagic, we yonk the model from url and place in /container/.u2net
+      outputs:
+        - source: /app/python
+          target: /container/python
+          uid: 65532
+          gid: 65532
+          diff: true
+        - source: /container/venv
+          target: /container/venv
+          uid: 65532
+          gid: 65532
+          diff: true
+        - source: /container/.u2net
+          target: /container/.u2net
+          uid: 65532
+          gid: 65532
+          diff: true
+        - source: /container/backend/
+          target: /container/backend/
+          uid: 65532
+          gid: 65532
+          diff: true
+        - source: /container/backend/entrypoint.py
+          target: /container/backend/entrypoint.py
+          uid: 65532
+          gid: 65532
+          diff: true
+        - source: /container/backend/healthcheck.py
+          target: /container/backend/healthcheck.py
+          uid: 65532
+          gid: 65532
+          diff: true
+accounts:
+  run-as: nonroot
+  users:
+    - name: nonroot
+      uid: 65532
+      gid: 65532
+  groups:
+    - name: nonroot
+      gid: 65532
+      members:
+        - nonroot
+
+ports:
+  - 5000/tcp
+
+entrypoint:
+  - /usr/bin/dumb-init
+  - --
+
+cmd:
+  - python
+  - /container/backend/entrypoint.py

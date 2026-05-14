@@ -25,7 +25,7 @@ RUN pnpm run build
 
 # Stage 2: PYTHON BACKEND BUILD
 # ------------------------------------------------------------------------------------------
-# Intent: Fallback to debian-base:trixie-debian13-dev because dhi.io/python:3.11-debian13 is 
+# Intent: Fallback to debian-base:trixie-debian13-dev because dhi.io/python:3.11-debian13 is
 # currently affected by CVE-2026-6100 (CVSS 9.1) without an upstream patch.
 # Ref: https://scout.docker.com/vulnerabilities/id/CVE-2026-6100
 FROM dhi.io/debian-base:trixie-debian13-dev@sha256:9415967aa0ed8adea8b5c048994259d1982026dca143d0303c7bbe0e11ed67d3 AS backend-build-stage
@@ -52,8 +52,8 @@ COPY --from=dhi.io/uv:0.11.11-debian13@sha256:33783120b652192063c0193ffbb6f5685d
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
     echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-# Workaround: BuildKit 'COPY' cannot dynamically resolve host-architecture triplet 
-# paths (e.g. x86_64 vs aarch64). We export the matching directory to a predictable 
+# Workaround: BuildKit 'COPY' cannot dynamically resolve host-architecture triplet
+# paths (e.g. x86_64 vs aarch64). We export the matching directory to a predictable
 # path (/dpkg-export) to facilitate architecture-agnostic multi-arch copying later.
 #
 # Strategy: Runtime Closure Extractor (ldd + dpkg-L hybrid)
@@ -122,7 +122,7 @@ RUN --mount=type=cache,target=/home/nonroot/.cache/uv,uid=65532,gid=65532 \
 # Pre-download rembg model to prevent download overhead during runtime.
 ENV U2NET_HOME=/container/.u2net
 # Intent: Since backend code is copied earlier, any code change invalidates layer cache.
-# We use a BuildKit cache mount at /cache/u2net so the model is not re-downloaded 
+# We use a BuildKit cache mount at /cache/u2net so the model is not re-downloaded
 # from the internet, then copy it to the persistent U2NET_HOME inside the image.
 RUN --mount=type=cache,target=/cache/u2net,uid=65532,gid=65532 \
     U2NET_HOME=/cache/u2net python - <<'PY' && cp -a /cache/u2net/. /container/.u2net/
@@ -137,7 +137,7 @@ PY
 COPY --chown=nonroot:nonroot entrypoint.py ./entrypoint.py
 COPY --chown=nonroot:nonroot healthcheck.py ./healthcheck.py
 
-# Create static site directory. Required pre-creation as a nonroot user 
+# Create static site directory. Required pre-creation as a nonroot user
 # to avoid permission issues when copying frontend assets.
 RUN mkdir -p /container/backend/image_converter/presentation/web/static_site
 
@@ -180,7 +180,7 @@ USER nonroot
 
 EXPOSE 5000
 
-# Constraint: The runtime hardened image lacks a shell (/bin/sh). 
+# Constraint: The runtime hardened image lacks a shell (/bin/sh).
 # We execute the healthcheck via python directly.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD ["python", "/container/healthcheck.py"]
