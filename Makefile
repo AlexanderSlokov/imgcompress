@@ -2,10 +2,27 @@ REGISTRY ?= docker.io/karimz1
 IMAGE ?= imgcompress
 TAG ?= latest
 DHI_YAML_FILE ?= docker/image/0.6.1-dhi.yaml
+ARTIFACT_IMAGE ?= $(REGISTRY)/$(IMAGE)-app
+ARTIFACT_TAG ?= 0.6.1
 CLOUD_BUILDER=
 
-# Build image with sbom and provenance,
-# good for Docker Scout to indexing layers and attestation.
+# ── DHI 2-Phase Build Workflow ──
+# Phase 1: Build application files → push as OCI artifact (needs internet for pip/pnpm).
+# Phase 2: DHI assembles hardened runtime from artifact + system packages.
+
+# Phase 1: Build and push the artifact-carrier.
+# After push, update the digest in $(DHI_YAML_FILE) under contents.artifacts.
+# Ex: make artifact_push REGISTRY=docker.io/thanhzeus2016 CLOUD_BUILDER=cloud-thanhzeus2016-aleksandr-slokov-cloud-builder
+artifact_push:
+	docker buildx build . \
+	--builder $(CLOUD_BUILDER) \
+	--target artifact-carrier \
+	--platform linux/amd64,linux/arm64 \
+	--push \
+	-t $(ARTIFACT_IMAGE):$(ARTIFACT_TAG)
+
+# Phase 2: Build hardened image from DHI yaml.
+# Requires artifact_push to have been run first.
 DHI_build:
 	docker buildx build . -f $(DHI_YAML_FILE) \
 	--platform linux/amd64,linux/arm64 \
@@ -22,6 +39,7 @@ DHI_cloud_build:
 	--platform linux/amd64,linux/arm64 \
 	--sbom=generator=dhi.io/scout-sbom-indexer:1 \
 	--provenance=1 \
+	--push \
 	-t $(REGISTRY)/$(IMAGE):$(TAG)
 
 # Call Trivy to scan image for vulnerabilites.

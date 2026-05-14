@@ -142,7 +142,30 @@ COPY --chown=nonroot:nonroot healthcheck.py ./healthcheck.py
 RUN mkdir -p /container/backend/image_converter/presentation/web/static_site
 
 
-# Stage 3: FINAL RUNTIME
+# Stage 3: ARTIFACT CARRIER (for DHI workflow)
+# ------------------------------------------------------------------------------------------
+# Minimal OCI image containing ONLY application files. No OS, no shell, no libs.
+# DHI yaml references this as an artifact and handles system deps via its package solver.
+#
+# Build + push:
+#   docker buildx build --target artifact-carrier \
+#     --platform linux/amd64,linux/arm64 \
+#     -t <registry>/imgcompress-app:0.6.1 --push .
+FROM scratch AS artifact-carrier
+
+COPY --from=backend-build-stage --chown=65532:65532 /container/ /container/
+
+COPY --from=frontend-build-stage --chown=65532:65532 /app/frontend/out/. \
+    /container/backend/image_converter/presentation/web/static_site
+COPY --from=frontend-build-stage --chown=65532:65532 /app/frontend/.next \
+    /container/backend/image_converter/presentation/web/static_site
+COPY --from=frontend-build-stage --chown=65532:65532 /app/frontend/public \
+    /container/backend/image_converter/presentation/web/static_site
+
+# This stage has no ENTRYPOINT — it exists solely as an OCI artifact for DHI.
+
+
+# Stage 4: FINAL RUNTIME (standalone Dockerfile, without DHI)
 # ------------------------------------------------------------------------------------------
 FROM dhi.io/debian-base:trixie-debian13@sha256:79ea7f22d1b7e3f73b0988258b62bcbf73da44f0d82476fbb95d811130168e55 AS final-stage
 
