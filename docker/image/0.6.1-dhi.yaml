@@ -67,17 +67,6 @@ contents:
     - libstdc++6
     - libgomp1
 
-  # ─────────────────────────────────────────────────────────────────────────
-  # Source code: fetched from Git with integrity check
-  # ─────────────────────────────────────────────────────────────────────────
-  # NOTE: Replace the checksum below with the actual sha256 of the Git tree
-  # after pushing to the test-build-dhi branch.
-  # You can obtain it with:
-  #   git ls-remote https://github.com/AlexanderSlokov/imgcompress.git refs/heads/test-build-dhi
-  # Then use the commit SHA as the checksum reference.
-  files:
-    - src: https://github.com/AlexanderSlokov/imgcompress.git#test-build-dhi
-      dest: /src/imgcompress
 
   # ─────────────────────────────────────────────────────────────────────────
   # Build stages
@@ -93,6 +82,7 @@ contents:
           - bash
           - coreutils
           - ca-certificates
+          - git
         artifacts:
           - name: dhi.io/pkg-node:24.15.0-debian13@sha256:2f5547b162a4c888c43583575a531fca4d0cf5db47f9130526f3f4a9b9236271
             includes:
@@ -117,6 +107,10 @@ contents:
             set -eux -o pipefail
 
             export PATH="/opt/nodejs/node-v24.15.0/bin:/usr/local/bin:$PATH"
+
+            # Clone source code into build sandbox
+            git clone --depth 1 --branch test-build-dhi \
+              https://github.com/AlexanderSlokov/imgcompress.git /src/imgcompress
 
             node --version
             pnpm --version
@@ -153,6 +147,7 @@ contents:
           - coreutils
           - ca-certificates
           - curl
+          - git
           # Build deps for native Python extensions (Pillow, cffi, etc.)
           - gcc
           - g++
@@ -186,6 +181,10 @@ contents:
             set -eux -o pipefail
 
             export PATH="/usr/local/bin:$PATH"
+
+            # Clone source code into build sandbox
+            git clone --depth 1 --branch test-build-dhi \
+              https://github.com/AlexanderSlokov/imgcompress.git /src/imgcompress
 
             # Install standalone Python 3.11 managed by uv
             # (statically built, no OS python dependency)
