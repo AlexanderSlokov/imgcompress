@@ -151,7 +151,7 @@ RUN mkdir -p /container/backend/image_converter/presentation/web/static_site
 #   docker buildx build --target artifact-carrier \
 #     --platform linux/amd64,linux/arm64 \
 #     -t <registry>/imgcompress-app:0.6.1 --push .
-FROM scratch AS artifact-carrier
+FROM dhi.io/alpine-base:3.23@sha256:27d91b0ae2dbb1bbf89398f4ee4564a0c7a14a82c34c8cffd3b2687033a9d97a AS artifact-carrier
 
 COPY --from=backend-build-stage --chown=65532:65532 /container/ /container/
 

@@ -18,7 +18,7 @@ artifact_push:
 	--builder $(CLOUD_BUILDER) \
 	--target artifact-carrier \
 	--platform linux/amd64,linux/arm64 \
-	--sbom=generator=dhi.io/scout-sbom-indexer:1 \
+	--sbom=true \
 	--provenance=mode=max \
 	--push \
 	-t $(ARTIFACT_IMAGE):$(ARTIFACT_TAG)
