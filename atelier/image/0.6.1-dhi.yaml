@@ -71,7 +71,7 @@ contents:
     # Application bundle built by: make artifact_push
     # Contains: Python runtime, venv, backend code, frontend static files, u2net model.
     # Rebuild + push the carrier, then update the digest below.
-    - name: docker.io/thanhzeus2016/imgcompress-app:0.6.1@sha256:bd71aa1221d24278025d493ebb0533eb76a9d2854101c065bfd99ae747fa62cd
+    - name: docker.io/thanhzeus2016/imgcompress-artifact-carrier:0.6.1@sha256:39d01bf3fc7d94227b25b1a21f7f9a03fe41b8505de60afb5cc9377cc8237ff6
       includes:
         - container/**
       uid: 65532

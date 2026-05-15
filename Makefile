@@ -1,8 +1,8 @@
 REGISTRY ?= docker.io/karimz1
 IMAGE ?= imgcompress
 TAG ?= latest
-DHI_YAML_FILE ?= docker/image/0.6.1-dhi.yaml
-ARTIFACT_IMAGE ?= $(REGISTRY)/$(IMAGE)-app
+DHI_YAML_FILE ?= atelier/image/0.6.1-dhi.yaml
+ARTIFACT_IMAGE ?= $(REGISTRY)/$(IMAGE)-artifact-carrier
 ARTIFACT_TAG ?= 0.6.1
 CLOUD_BUILDER=
 
@@ -18,6 +18,8 @@ artifact_push:
 	--builder $(CLOUD_BUILDER) \
 	--target artifact-carrier \
 	--platform linux/amd64,linux/arm64 \
+	--sbom=generator=dhi.io/scout-sbom-indexer:1 \
+	--provenance=mode=max \
 	--push \
 	-t $(ARTIFACT_IMAGE):$(ARTIFACT_TAG)
 
@@ -26,10 +28,10 @@ artifact_push:
 DHI_build:
 	docker buildx build . -f $(DHI_YAML_FILE) \
 	--platform linux/amd64,linux/arm64 \
-	--sbom=generator=dhi.io/scout-sbom-indexer:1 \
-	--provenance=1 \
+	--sbom=true \
+	--provenance=mode=max \
+	--push \
 	-t $(REGISTRY)/$(IMAGE):$(TAG)
-
 
 # Use Docker Hub Cloudbuild for faster build.
 # Need a Docker Hub account and must init a Cloud Builder first.

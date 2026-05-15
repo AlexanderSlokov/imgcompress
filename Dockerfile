@@ -108,7 +108,7 @@ RUN --mount=type=cache,target=/home/nonroot/.cache/uv,uid=65532,gid=65532 \
 
 WORKDIR /container
 
-COPY --chown=nonroot:nonroot requirements.txt .
+COPY --chown=nonroot:nonroot atelier/image/requirements.txt .
 COPY --chown=nonroot:nonroot setup.py .
 
 RUN --mount=type=cache,target=/home/nonroot/.cache/uv,uid=65532,gid=65532 \
