@@ -2,7 +2,6 @@ REGISTRY ?= docker.io/karimz1
 IMAGE ?= imgcompress
 TAG ?= latest
 DHI_YAML_FILE ?= atelier/image/0.6.1-dhi.yaml
-DHI_DOCKERFILE ?= atelier/image/dhi.Dockerfile
 ARTIFACT_IMAGE ?= $(REGISTRY)/$(IMAGE)-artifact-carrier
 ARTIFACT_TAG ?= 0.6.1
 CLOUD_BUILDER=
@@ -12,7 +11,7 @@ CLOUD_BUILDER=
 # Phase 2: DHI assembles hardened runtime from artifact + system packages.
 
 # Phase 1: Build and push the artifact-carrier.
-# After push, update the digest in $(DOCKER_YAML_FILE) under contents.artifacts.
+# After push, update the digest in $(DHI_YAML_FILE) under contents.artifacts.
 # Ex: make artifact_push REGISTRY=docker.io/thanhzeus2016 CLOUD_BUILDER=cloud-thanhzeus2016-aleksandr-slokov-cloud-builder
 artifact_push:
 	docker buildx build . \
@@ -27,7 +26,7 @@ artifact_push:
 # Phase 2: Build hardened image from DHI yaml.
 # Requires artifact_push to have been run first.
 DHI_build:
-	docker buildx build . -f $(DOCKER_YAML_FILE) \
+	docker buildx build . -f $(DHI_YAML_FILE) \
 	--platform linux/amd64,linux/arm64 \
 	--sbom=true \
 	--provenance=mode=max \
@@ -37,24 +36,11 @@ DHI_build:
 # Use Docker Hub Cloudbuild for faster build.
 # Need a Docker Hub account and must init a Cloud Builder first.
 DHI_cloud_build:
-	docker buildx build . -f $(DOCKER_YAML_FILE) \
+	docker buildx build . -f $(DHI_YAML_FILE) \
 	--builder $(CLOUD_BUILDER) \
 	--platform linux/amd64,linux/arm64 \
 	--sbom=generator=dhi.io/scout-sbom-indexer:1 \
 	--provenance=1 \
-	--push \
-	-t $(REGISTRY)/$(IMAGE):$(TAG)
-
-# Or you can build the Final Image with standard Dockerfile. 
-# The reason is Docker Scout got confuse when it sees multiple Base Image.
-# So we need a dedicated file for it.
-DHI_dockerfile_cloud_build:
-	docker buildx build . \
-	-f $(DHI_DOCKERFILE) \
-	--builder $(CLOUD_BUILDER) \
-	--platform linux/amd64,linux/arm64 \
-	--sbom=true \
-	--provenance=mode=max \
 	--push \
 	-t $(REGISTRY)/$(IMAGE):$(TAG)
 
