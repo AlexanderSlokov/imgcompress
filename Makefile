@@ -64,8 +64,8 @@ local_build:
 # which kills test-runner when the startup-test container (spawned via
 # `docker run` inside the test suite) exits.
 test_blackbox:
-	docker compose -f docker-compose.test.yml up --build -d
-	docker compose -f docker-compose.test.yml logs -f test-runner || true
+	docker compose -f atelier/docker-compose.test.yml up --build -d
+	docker compose -f atelier/docker-compose.test.yml logs -f test-runner || true
 	@exit_code=$$(docker inspect --format='{{.State.ExitCode}}' imgcompress-test-runner-1 2>/dev/null || echo 1); \
-	docker compose -f docker-compose.test.yml down 2>/dev/null || true; \
+	docker compose -f atelier/docker-compose.test.yml down 2>/dev/null || true; \
 	exit $$exit_code
