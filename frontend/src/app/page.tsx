@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useDropzone } from "react-dropzone";
-import Image from "next/image";
-import { useTheme } from "next-themes";
+import { useMountedTheme } from "@/hooks/useMountedTheme";
 import { HardDrive } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { HelpButton } from "@/components/HelpButton";
@@ -27,17 +27,23 @@ import PageFooter from "@/components/PageFooter";
 import FileConversionForm from "@/components/FileConversionForm";
 import { DownloadZipToast } from "@/components/CustomToast";
 import { SplashScreen } from "@/components/SplashScreen";
+import { DevModePanel } from "@/components/DevModePanel";
+import { BrandLogo } from "@/components/BrandLogo";
 import { ErrorStoreProvider, useErrorStore } from "@/context/ErrorStore";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
 import { useSupportedExtensions } from "@/hooks/useSupportedExtensions";
 import { useRembgModel } from "@/hooks/useRembgModel";
+import { useCropUnsupportedExtensions } from "@/hooks/useCropUnsupportedExtensions";
+import { applyCropToFile, CropConfig } from "@/lib/crop";
 import { cn } from "@/lib/utils";
 
 
 function HomePageContent() {
+  const { t } = useTranslation();
   const [disableLogo, setDisableLogo] = useState(false);
   const [configReady, setConfigReady] = useState(false);
   const [storageManagementDisabled, setStorageManagementDisabled] = useState(false);
+  const [devMode, setDevMode] = useState(false);
 
   useEffect(() => {
     const loadRuntimeConfig = async () => {
@@ -49,10 +55,12 @@ function HomePageContent() {
         const disableStorage =
           config.DISABLE_STORAGE_MANAGEMENT === "true";
         setStorageManagementDisabled(disableStorage);
+        setDevMode(config.DEV_MODE === "true");
       } catch (err) {
-        console.warn("DISABLE_LOGO config missing or invalid, defaulting to false", err);
+        console.warn("Runtime config missing or invalid, defaulting flags off", err);
         setDisableLogo(false);
         setStorageManagementDisabled(false);
+        setDevMode(false);
       } finally {
         setConfigReady(true);
       }
@@ -67,12 +75,18 @@ function HomePageContent() {
     isLoading: extensionsLoading,
     error: extensionsError,
   } = useSupportedExtensions();
+  const {
+    unsupportedExtensions: cropUnsupportedExtensions,
+  } = useCropUnsupportedExtensions();
   const { modelName: rembgModelName } = useRembgModel();
 
   const formattedSupportedExtensions = supportedExtensions.map((ext) =>
     ext.startsWith(".") ? ext : `.${ext}`
   );
   const formattedVerifiedExtensions = verifiedExtensions.map((ext) =>
+    ext.startsWith(".") ? ext : `.${ext}`
+  );
+  const formattedCropUnsupportedExtensions = cropUnsupportedExtensions.map((ext) =>
     ext.startsWith(".") ? ext : `.${ext}`
   );
 
@@ -94,14 +108,15 @@ function HomePageContent() {
   const [useRembg, setUseRembg] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [fileManagerOpen, setFileManagerOpen] = useState(false);
+  const [crops, setCrops] = useState<Record<string, CropConfig>>({});
+  const [openCropFor, setOpenCropFor] = useState<string | null>(null);
 
   const [fileManagerRefresh, setFileManagerRefresh] = useState(0);
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
   const { error, setError, clearError } = useErrorStore();
   const { isDown } = useBackendHealth();
-  const { resolvedTheme } = useTheme();
-  const isDarkTheme = resolvedTheme !== "light";
+  const { isDarkTheme } = useMountedTheme();
   const backgroundClass = isDarkTheme
     ? "bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-gray-50"
     : "bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-900";
@@ -173,12 +188,12 @@ function HomePageContent() {
       });
 
       unsupportedFiles.forEach((fileName) => {
-        toast.error(`Unsupported File Format: ${fileName}`);
+        toast.error(t("page.toast.unsupportedFormat", { fileName }));
       });
 
       if (unsupportedFiles.length > 0) {
         setError({
-          message: `${unsupportedFiles.length} file(s) were rejected due to unsupported file types.`,
+          message: t("page.toast.filesRejected", { count: unsupportedFiles.length }),
         });
       }
 
@@ -200,14 +215,14 @@ function HomePageContent() {
       e.preventDefault();
 
       if (files.length === 0) {
-        setError({ message: "Please drop or select some files first." });
-        toast.error("Please drop or select some files first.");
+        setError({ message: t("page.toast.noFilesError") });
+        toast.error(t("page.toast.noFilesError"));
         return;
       }
 
       if (!outputFormat) {
-        setError({ message: "Please select an output format first." });
-        toast.error("Please select an output format first.");
+        setError({ message: t("page.toast.noFormatError") });
+        toast.error(t("page.toast.noFormatError"));
         setFormatRequired(true);
         return;
       }
@@ -215,8 +230,8 @@ function HomePageContent() {
       if ((outputFormat === "jpeg" || outputFormat === "avif") && compressionMode === "quality") {
         const qualityNum = parseInt(quality, 10);
         if (isNaN(qualityNum) || qualityNum < 1 || qualityNum > 100) {
-          setError({ message: "Quality must be a number between 1 and 100." });
-          toast.error("Quality must be a number between 1 and 100.");
+          setError({ message: t("page.toast.qualityRangeError") });
+          toast.error(t("page.toast.qualityRangeError"));
           return;
         }
       }
@@ -224,25 +239,23 @@ function HomePageContent() {
       if (resizeWidthEnabled) {
         const widthNum = parseInt(width, 10);
         if (isNaN(widthNum) || widthNum <= 0) {
-          setError({ message: "Width must be a positive number." });
-          toast.error("Width must be a positive number.");
+          setError({ message: t("page.toast.widthPositiveError") });
+          toast.error(t("page.toast.widthPositiveError"));
           return;
         }
 
         if (outputFormat === "ico" && widthNum > 256) {
-          toast.info(
-            "ICO format is limited to a max width of 256px. Your input has been clamped to 256."
-          );
+          toast.info(t("page.toast.icoWidthClamped"));
           setWidth("256");
         }
       }
 
       if ((outputFormat === "jpeg" || outputFormat === "avif") && compressionMode === "size") {
         const trimmed = (targetSizeMB || "").trim();
-        const t = parseFloat(trimmed);
-        if (!trimmed || isNaN(t) || t <= 0) {
-          setError({ message: "Please set a positive Max file size (in MB)." });
-          toast.error("Please set a positive Max file size (in MB).");
+        const parsedSize = parseFloat(trimmed);
+        if (!trimmed || isNaN(parsedSize) || parsedSize <= 0) {
+          setError({ message: t("page.toast.targetSizeError") });
+          toast.error(t("page.toast.targetSizeError"));
           return;
         }
       }
@@ -252,8 +265,29 @@ function HomePageContent() {
       setConverted([]);
       setDestFolder("");
 
+      let processedFiles: File[];
+      try {
+        processedFiles = await Promise.all(
+          files.map((file) => {
+            const cfg = crops[file.name];
+            return cfg ? applyCropToFile(file, cfg) : Promise.resolve(file);
+          })
+        );
+      } catch (cropErr) {
+        const message =
+          cropErr instanceof Error ? cropErr.message : "Failed to apply crop.";
+        setError({
+          message: `Crop failed: ${message}`,
+          details:
+            cropErr instanceof Error && cropErr.stack ? cropErr.stack : undefined,
+          isApiError: true,
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const formData = new FormData();
-      files.forEach((file) => formData.append("files[]", file));
+      processedFiles.forEach((file) => formData.append("files[]", file));
       if ((outputFormat === "jpeg" || outputFormat === "avif") && compressionMode === "quality") {
         formData.append("quality", quality);
       }
@@ -315,7 +349,6 @@ function HomePageContent() {
             details,
             isApiError: true,
           });
-          toast.error(message);
           return;
         }
 
@@ -328,21 +361,19 @@ function HomePageContent() {
         setDrawerOpen(true);
         await delay(600);
         toast.success(
-          `${data.converted_files.length} Image${data.converted_files.length > 1 ? "s" : ""
-          } compressed successfully!`
+          t("page.toast.compressedSuccess", { count: data.converted_files.length })
         );
       } catch (err) {
         if ((err as Error).name === "AbortError") {
-          console.log("Upload aborted");
           return;
         }
         console.error(err);
         setError({
-          message: "Something went wrong. Please try again.",
+          message: t("page.toast.unexpectedError"),
           details: err instanceof Error ? err.message : undefined,
           isApiError: true,
         });
-        toast.error("Something went wrong. Please try again.");
+        toast.error(t("page.toast.unexpectedError"));
       } finally {
         setIsLoading(false);
       }
@@ -362,20 +393,40 @@ function HomePageContent() {
       pdfScale,
       pdfMarginMm,
       pdfPaginate,
+      crops,
     ]
   );
 
   const clearFileSelection = useCallback(() => {
     setFiles([]);
+    setCrops({});
+    setOpenCropFor(null);
     if (files.length > 0) {
-      toast.info(
-        `${files.length} Image${files.length !== 1 ? "s" : ""} selection cleared! 🧹`
-      );
+      toast.info(t("page.toast.selectionCleared", { count: files.length }));
     }
   }, [files]);
 
   const removeFile = useCallback((fileName: string) => {
     setFiles((prev) => prev.filter((f) => f.name !== fileName));
+    setCrops((prev) => {
+      if (!(fileName in prev)) return prev;
+      const next = { ...prev };
+      delete next[fileName];
+      return next;
+    });
+    setOpenCropFor((prev) => (prev === fileName ? null : prev));
+  }, []);
+
+  const setCropForFile = useCallback((fileName: string, crop: CropConfig | null) => {
+    setCrops((prev) => {
+      if (crop == null) {
+        if (!(fileName in prev)) return prev;
+        const next = { ...prev };
+        delete next[fileName];
+        return next;
+      }
+      return { ...prev, [fileName]: crop };
+    });
   }, []);
 
   const handleDownloadAll = useCallback(() => {
@@ -390,18 +441,16 @@ function HomePageContent() {
       const res = await fetch("/api/force_cleanup", { method: "POST" });
       const json = await res.json();
       if (json.status === "ok") {
-        toast.success(
-          "Deletion Complete. Your processed files have been permanently removed. 🧹🧹🧹"
-        );
+        toast.success(t("page.toast.cleanupSuccess"));
         setConverted([]);
         setDestFolder("");
         setDrawerOpen(false);
         setFileManagerRefresh((prev) => prev + 1);
       } else {
-        toast.error(json.error || "Force cleanup failed.");
+        toast.error(json.error || t("page.toast.cleanupFailed"));
       }
     } catch (error) {
-      toast.error("🚨 Cleanup failed.");
+      toast.error(t("page.toast.cleanupError"));
       console.error(error);
     }
   }, []);
@@ -411,7 +460,7 @@ function HomePageContent() {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
       setIsLoading(false);
-      toast.info("Compression cancelled.");
+      toast.info(t("page.toast.compressionCancelled"));
     }
   }, []);
 
@@ -429,20 +478,17 @@ function HomePageContent() {
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
         >
-          <div className={cn("absolute -top-20 right-0 h-56 w-56 rounded-full blur-[100px]", accentOneClass)} />
-          <div className={cn("absolute bottom-0 left-0 h-64 w-64 rounded-full blur-[120px]", accentTwoClass)} />
+          <div className={cn("absolute -top-16 right-0 h-48 w-48 rounded-full blur-[64px]", accentOneClass)} />
+          <div className={cn("absolute bottom-0 left-0 h-56 w-56 rounded-full blur-[72px]", accentTwoClass)} />
         </div>
         <ToastContainer />
         <Card className={cn("w-full max-w-3xl border backdrop-blur-xl transition-colors", cardClass)}>
           {configReady && !disableLogo ? (
             <CardHeader className="pt-12 pb-8 flex flex-col items-center">
-              <Image
-                src="/logo_transparent.png"
+              <BrandLogo
                 width={260}
                 height={260}
                 alt="ImgCompress - Image Compression Tool"
-                priority
-                draggable={false}
                 className="h-auto w-[220px] sm:w-[240px] md:w-[260px] drop-shadow-xl"
               />
             </CardHeader>
@@ -453,8 +499,8 @@ function HomePageContent() {
               >
                 imgcompress
               </CardTitle>
-              <p className="text-center text-sm md:text-base text-muted-foreground mt-2">
-                An Image Compression Tool
+              <p className="text-center text-sm md:text-base text-muted-foreground mt-2" data-testid="page-subtitle">
+                {t("page.subtitle")}
               </p>
             </CardHeader>
           )}
@@ -483,6 +529,10 @@ function HomePageContent() {
               removeFile={removeFile}
               clearFileSelection={clearFileSelection}
               onSubmit={handleSubmit}
+              crops={crops}
+              openCropFor={openCropFor}
+              setOpenCropFor={setOpenCropFor}
+              setCropForFile={setCropForFile}
               targetSizeMB={targetSizeMB}
               setTargetSizeMB={setTargetSizeMB}
               compressionMode={compressionMode}
@@ -495,15 +545,23 @@ function HomePageContent() {
               isDragActive={isDragActive}
               supportedExtensions={formattedSupportedExtensions}
               verifiedExtensions={formattedVerifiedExtensions}
+              cropUnsupportedExtensions={formattedCropUnsupportedExtensions}
               extensionsLoading={extensionsLoading}
               extensionsError={extensionsError}
+              disableLogo={configReady ? disableLogo : false}
+              onReportCropError={(payload) =>
+                setError({
+                  message: payload.message,
+                  details: payload.details,
+                  isApiError: true,
+                })
+              }
             />
           </CardContent>
         </Card>
 
         {!storageManagementDisabled && (
           <>
-            {/* A floating button to open the FileManager drawer */}
             <div className="fixed bottom-4 right-4">
               <button
                 disabled={isLoading}
@@ -516,7 +574,6 @@ function HomePageContent() {
               </button>
             </div>
 
-            {/* Drawer for File Manager */}
             <Drawer open={fileManagerOpen} onOpenChange={setFileManagerOpen}>
               <DrawerTrigger asChild>
                 <button className="hidden" />
@@ -525,7 +582,7 @@ function HomePageContent() {
                   <VisuallyHidden>
                     <DrawerHeader>
                       <DrawerTitle className="text-lg font-semibold text-center">
-                        Admin Tools
+                        {t("page.adminTools")}
                       </DrawerTitle>
                     </DrawerHeader>
                   </VisuallyHidden>
@@ -552,6 +609,7 @@ function HomePageContent() {
         )}
 
         <ErrorModal />
+        {configReady && devMode && <DevModePanel />}
         <PageFooter />
       </div>
     </div>

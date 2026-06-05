@@ -2,7 +2,7 @@
   <img src="./images/logo-mini-2.webp" alt="ImgCompress logo" height="80px" />
   <h1>ImgCompress</h1>
   <p><strong>Every image format. Zero cloud.</strong></p>
-  <p>Convert 70+ formats, compress in bulk, and remove backgrounds with local AI.<br/>Everything runs inside your container, so your files never leave your server.</p>
+  <p>Convert 70+ formats, crop per file, compress in bulk, and remove backgrounds with local AI. UI in 12 languages.<br/>Everything runs inside your container, so your files never leave your server.</p>
 
   <p>
     <a href="https://imgcompress.karimzouine.com/">
@@ -19,6 +19,18 @@
     </a>
     <a href="https://github.com/karimz1/imgcompress/stargazers">
       <img src="https://img.shields.io/github/stars/karimz1/imgcompress?style=flat-square&color=f4d03f&label=Stars&logo=github&logoColor=black" alt="GitHub Stars" />
+    </a>
+  </p>
+
+  <p>
+    <a href="https://github.com/awesome-selfhosted/awesome-selfhosted#readme">
+      <img src="https://awesome.re/mentioned-badge-flat.svg" alt="Mentioned in Awesome Self-Hosted" />
+    </a>
+    <a href="https://coolify.io/docs/services/imgcompress?utm_source=github.com">
+      <img src="https://img.shields.io/badge/Coolify-Official%20Service-8b5cf6?style=flat-square&logoColor=white" alt="Available as official Coolify service" />
+    </a>
+    <a href="./TRANSLATIONS.md">
+      <img src="https://img.shields.io/badge/Multi--language-12%20locales-16a34a?style=flat-square&logo=googletranslate&logoColor=white" alt="Multi-language support: 12 locales" />
     </a>
   </p>
 
@@ -53,6 +65,7 @@ Built for people, homelab enthusiasts, and anyone who values privacy and owns th
 | **Local AI Background Removal** | Bundled model runs on your CPU. No API key, no subscription, no upload |
 | **Bulk Compression** | Multi-core parallel processing across entire photo libraries |
 | **Format Conversion** | HEIC to WebP, PSD to JPG, image batches to paginated PDF, and more |
+| **Per-File Cropping** | Crop each upload before conversion with ratio presets (Free, 1:1, 16:9, 4:3) or custom pixel dimensions |
 | **Web UI + CLI** | Browser dashboard for day-to-day use; CLI for scripting pipelines |
 | **Single Container** | Every codec and library pre-bundled, zero host dependencies |
 | **Air-Gap Ready** | Once pulled, runs fully offline. No internet required, ever |
@@ -66,6 +79,28 @@ Stop uploading personal or client photos to cloud-based removers. ImgCompress sh
 | Original | Background Removed |
 |:---:|:---:|
 | <img src="images/image-remover-examples/landscape-with-sunset-yixing-original.avif" width="380" alt="Original sunset landscape photo"/> | <img src="images/image-remover-examples/landscape-with-sunset-yixing-ai-transparency.avif" width="380" alt="Same photo with background removed by local AI"/> |
+
+---
+
+## Per-File Cropping (since v0.7.0)
+
+Every upload gets its own crop overlay before conversion. Pick a ratio preset (Free, 1:1, 16:9, 4:3) or type exact pixel width and height. Selections are saved per file, so one batch can mix square thumbnails with 16:9 covers without re-uploading.
+
+<img src="images/web-ui/web-ui-crop-feature.webp" alt="ImgCompress crop overlay with aspect-ratio presets, zoom slider, pixel dimensions, and keyboard shortcuts" width="100%" />
+
+### How to use it
+
+1. Drop your images into the upload area as usual.
+2. On any file row, click the crop icon to open the editor.
+3. Pick an aspect ratio preset (1:1, 4:3, 16:9, …) or set width and height manually.
+4. Zoom and crop to frame the shot exactly the way you want it.
+5. Click **Save** to keep the crop, **Discard** to back out, or **Remove** to clear a previously saved crop.
+6. Convert as normal. The crop is applied first, then your chosen format, quality, resize, and background-removal settings.
+
+> [!NOTE]
+> **Server-rendered formats:** Some formats (e.g. PSD, EPS) are rendered server-side into a crop-friendly bitmap so you can still crop them in the browser.
+
+Full walkthrough and demo video: **[Image Crop Editor docs](https://imgcompress.karimzouine.com/docs/web-ui#image-crop-editor)**.
 
 ---
 
@@ -118,6 +153,64 @@ I chose Docker because it keeps your computer clean. Instead of you having to in
 
 ---
 
+## Security-Hardened Architecture
+
+ImgCompress is built with a **Security-Hardened, Minimal Image** architecture, bringing de facto container security standards to your homelab or production environment.
+
+| | |
+|---|---|
+| **Minimal Surface** | No shell (`bash`, `sh`), no network tools (`curl`, `wget`, etc.), no package manager. The attack surface is drastically reduced. |
+| **Minimal Components** | System dependencies are aggressively pruned to maintain a minimal runtime environment. |
+| **Non-root User** | Runs as a non-root user `nonroot` by default. |
+| **DHI Base Images** | Using Docker Hardened Images from the official [DHI](https://www.docker.com/products/hardened-images/) project for build phases and runtime Image. |
+| **SBOM and Provenance** | The Docker Image is built with a full Software Bill of Materials (SBOM) and build provenance attestation. |
+
+<div **align**="right">
+  <a href="https://github.com/AlexanderSlokov">
+    <img src="https://img.shields.io/badge/Contributions_by-Aleksandr_Slokov-0f172a?style=for-the-badge&logo=shield&logoColor=white" alt="Contributions by Aleksandr Slokov" />
+  </a>
+</div>
+
+---
+
+## Multilingual Support
+
+ImgCompress supports multiple frontend languages and welcomes community improvements to every locale. See the **[translation guide](TRANSLATIONS.md)** to add a new language, improve an existing translation, or get credited for meaningful language updates.
+
+Supported languages:
+
+- English
+- Spanish
+- Spanish (Mexico)
+- Chinese (Simplified)
+- Hindi
+- Arabic
+- French
+- Portuguese (Brazil)
+- Russian
+- Japanese
+- German
+- Hungarian
+
+<div **align**="right">
+  <a href="https://github.com/karimz1/imgcompress/issues/653">
+    <img src="https://img.shields.io/badge/i18 Featrue Contribution_by-nagyonmarci-0f172a?style=for-the-badge&logo=shield&logoColor=white" alt="Contributions by nagyonmarci" />
+  </a>
+</div>
+
+---
+
+## Featured On
+
+ImgCompress is recognized by the self-hosted community and is part of curated lists and platforms that self-hosters already rely on:
+
+- **[Awesome Self-Hosted](https://github.com/awesome-selfhosted/awesome-selfhosted#readme)** [![Stars](https://img.shields.io/github/stars/awesome-selfhosted/awesome-selfhosted?style=flat-square&label=&color=f4d03f&logo=github&logoColor=black)](https://github.com/awesome-selfhosted/awesome-selfhosted): community-curated index of self-hosted software, listed alongside the tools self-hosters already run in production. [Jump to the imgcompress entry](https://awesome-selfhosted.net/index.html#imgcompress).
+- **[Coolify](https://github.com/coollabsio/coolify)** [![Stars](https://img.shields.io/github/stars/coollabsio/coolify?style=flat-square&label=&color=f4d03f&logo=github&logoColor=black)](https://github.com/coollabsio/coolify): open-source, self-hostable deployment platform. ImgCompress is available as an **official Coolify service**, so you can add it to your stack straight from the Coolify dashboard. [Jump to the imgcompress entry](https://coolify.io/docs/services/imgcompress?utm_source=github.com).
+
+> Know another platform that features ImgCompress, or want to add it to one? [Get in touch](https://www.karimzouine.com/#contact). Big thanks to the open-source community for getting ImgCompress noticed in the first place.
+
+---
+
 ## Documentation
 
 - [Installation & Configuration](https://imgcompress.karimzouine.com/docs/installation): Docker setup, environment variables, reverse proxy examples
@@ -141,12 +234,7 @@ Contributions are welcome: bug reports, format requests, or pull requests.
 - Every change is verified by a Playwright E2E suite that covers all supported formats
 
 > [!NOTE]
-> **Meet [imgcompress-chan](https://imgcompress.karimzouine.com/docs/imgcompress-chan)**, the repo's custom helper bot. She auto-merges Dependabot PRs once CI passes, and if a frontend dependency update leaves a broken `pnpm-lock.yaml` you can also ask her to fix it on the spot:
->
-> > Hey chan, can you `/chan-fix` it please? 💛
->
-> She'll refresh the branch from `main`, regenerate the lockfile, and push the repair commit so CI re-runs. More tricks coming as she learns.
-
+> **Meet [imgcompress-chan](https://imgcompress.karimzouine.com/docs/imgcompress-chan)**, the repo's custom helper bot. She auto-merges Dependabot PRs once CI passes, and if a frontend dependency update leaves a broken `pnpm-lock.yaml`.
 ---
 
 ## License & Author

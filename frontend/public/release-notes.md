@@ -1,3 +1,49 @@
+## v0.8.2 — 2026-06-04
+
+- UI: Replaced emoji language flags with cross-platform [`flag-icons`](https://github.com/lipis/flag-icons) so flag rendering is consistent across Windows, Linux, and macOS. Reported via email by Armin. [#669](https://github.com/karimz1/imgcompress/issues/669)
+- Docker: Bootstrapped a local `docker-container` buildx builder via `scripts/ensureBuildxBuilder.sh` and threaded `--builder` through the Makefile and dev scripts, so builds no longer require Docker Cloud or hit Cloud Build quotas. [#670](https://github.com/karimz1/imgcompress/issues/670)
+- Security: Bumped DHI base image digests (Debian 13.4 → 13.5), `uv` 0.11.11 → 0.11.18, and 6 runtime Python packages (`pycparser`, `pillow_heif`, `psd-tools`, `rembg`, `onnxruntime`, `fpdf2`). Trivy now reports 0 vulnerabilities, down from 1 HIGH (libcap2 CVE-2026-4878). [#671](https://github.com/karimz1/imgcompress/issues/671)
+- Docs: Added a dedicated Per-File Cropping section to the README with walkthrough, screenshot, and YouTube demo link.
+
+## v0.8.1 — 2026-05-30
+
+This patch release addresses a dependency oversight from [v0.8.0](https://github.com/karimz1/imgcompress/releases/tag/release_0.8.0), forgot to update the ``release-notes.md`` which triggers ``Update available`` even on the latest version.
+
+### 🐛 Bug Fixes
+- Fixed incorrect version display causing false "Update Available" notification — see [#668](https://github.com/karimz1/imgcompress/issues/668)
+
+## v0.8.0 — 2026-05-30
+
+- Feature: Added multi-language support to the imgcompress web UI.
+  Special thanks to [nagyonmarci](https://github.com/nagyonmarci) for contributing the initial [i18n support](https://github.com/karimz1/imgcompress/issues/653) and the Hungarian translation.
+
+- Added additional language files [@karimz1](https://github.com/karimz1).
+  Some translations were created with the help of online translation tools, so they may not be perfect. If you notice anything incorrect or unnatural, contributions are welcome.
+
+- Internals: Updated Frontend Dependencies to latest security patch.
+
+| Locale | Language | Credit | Status |
+| --- | --- | --- | --- |
+| `en` | English | [karimz1](https://github.com/karimz1) | Source language |
+| `hu` | Hungarian | [nagyonmarci](https://github.com/nagyonmarci) | Community translation |
+| `de` | German | Online tools | Not validated |
+| `ar` | Arabic | Online tools | Not validated |
+| `es` | Spanish | Online tools | Not validated |
+| `es-MX` | Spanish (Mexico) | Online tools | Not validated |
+| `fr` | French | Online tools | Not validated |
+| `hi` | Hindi | Online tools | Not validated |
+| `ja` | Japanese | Online tools | Not validated |
+| `pt-BR` | Portuguese (Brazil) | Online tools | Not validated |
+| `ru` | Russian | Online tools | Not validated |
+| `zh-CN` | Chinese (Simplified) | Online tools | Not validated |
+
+## v0.7.0 — 2026-05-24
+- Feature: Image Crop Editor for per-file cropping before conversion. [#625](https://github.com/karimz1/imgcompress/issues/625)
+- Docker Improvements: First-time contributor [@AlexanderSlokov](https://github.com/AlexanderSlokov) hardened the image (non-root, reduced OS attack surface) across AMD64 and ARM64, and refactored the healthcheck, entrypoint, and Makefile in [#626](https://github.com/karimz1/imgcompress/pull/626).
+- Internal: Refactored the backend toward cleaner architecture using domain DTOs for a better developer experience.
+- CI: Added Python lint, a feature flag matrix, and a pre-publish image scan for auditability.
+- Internal: Expanded test coverage and added a DEV_MODE flag for triggering error states during UI testing.
+
 ## v0.6.1 — 2026-04-18
 - Feature: Add GitHub Star Banner to Compressed Files Drawer [#599](https://github.com/karimz1/imgcompress/issues/599)
 - Update Dependencies: This update brings all dependencies to the latest release candidates available at the time, improving security, stability, and overall reliability for imgcompress.

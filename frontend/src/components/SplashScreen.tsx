@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
+import { useTranslation } from "react-i18next";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { VisuallyHidden } from "@/components/visually-hidden";
+import { BrandLogo } from "@/components/BrandLogo";
 import { cn } from "@/lib/utils";
 
 interface SplashScreenProps {
@@ -12,25 +13,6 @@ interface SplashScreenProps {
   disableLogo?: boolean;
 }
 
-const waitMessages = [
-  "Compressing your files…",
-  "Optimizing quality and size.",
-  "Re-encoding images, please hold on.",
-  "Large uploads can take a moment.",
-  "Still working—thanks for your patience.",
-  "Cleaning up and preparing your downloads.",
-  "Balancing speed with quality right now.",
-  "Finishing touches on the output files.",
-  "Crunching pixels into smaller packages.",
-  "Almost there—writing final bytes.",
-  "Checking file integrity.",
-  "Wrapping up conversion tasks.",
-  "Making sure everything looks good.",
-];
-
-const helpfulTips = [
-  "Keep working—leave this window open and I’ll drop your compressed files here when they’re ready.",
-];
 
 type ParticleConfig = {
   id: number;
@@ -56,22 +38,18 @@ export function SplashScreen({
   onAbort,
   disableLogo = false,
 }: SplashScreenProps) {
+  const { t } = useTranslation();
   const [messageIndex, setMessageIndex] = useState(0);
-
-  // Typewriter state for the current message
   const [displayText, setDisplayText] = useState("");
 
-  const statusMessage = useMemo(() => waitMessages[messageIndex], [messageIndex]);
-  const tipMessage = useMemo(
-    () => helpfulTips[Math.floor(Math.random() * helpfulTips.length)],
-    [isVisible]
-  );
+  const waitMessages = t("splash.messages", { returnObjects: true }) as string[];
+  const statusMessage = useMemo(() => waitMessages[messageIndex], [messageIndex, waitMessages]);
+  const tipMessage = t("splash.tip");
 
-  // Rotate messages while visible
   useEffect(() => {
     if (!isVisible) return;
 
-    setMessageIndex(0); // reset when it re-opens
+    setMessageIndex(0);
 
     const interval = setInterval(() => {
       setMessageIndex((prev) => (prev + 1) % waitMessages.length);
@@ -80,7 +58,6 @@ export function SplashScreen({
     return () => clearInterval(interval);
   }, [isVisible]);
 
-  // Typewriter effect whenever the message changes
   useEffect(() => {
     if (!isVisible) return;
 
@@ -123,9 +100,9 @@ export function SplashScreen({
           className="fixed inset-0 z-[101] flex items-center justify-center outline-none bg-transparent p-0"
         >
           <VisuallyHidden>
-            <DialogPrimitive.Title>Compressing Files</DialogPrimitive.Title>
+            <DialogPrimitive.Title>{t("splash.dialogTitle")}</DialogPrimitive.Title>
             <DialogPrimitive.Description>
-              Please wait while your files are being compressed.
+              {t("splash.dialogDescription")}
             </DialogPrimitive.Description>
           </VisuallyHidden>
 
@@ -263,20 +240,17 @@ export function SplashScreen({
               {!disableLogo && (
                 <div className="w-full flex justify-center animate-breathe">
                   <div className="relative w-[460px] h-[220px] max-w-[92vw] sm:w-[520px] sm:h-[240px] animate-glow after:absolute after:inset-0 after:rounded-[36%] after:bg-gradient-to-r after:from-blue-500/20 after:to-fuchsia-500/20 after:blur-3xl after:-z-10">
-                    <Image
-                      src="/logo_transparent.png"
-                      alt="ImgCompress Logo"
+                    <BrandLogo
                       fill
-                      draggable={false}
+                      alt="ImgCompress Logo"
+                      sizes="(min-width: 640px) 520px, 460px"
                       className="object-contain"
-                      priority
                     />
                   </div>
                 </div>
               )}
 
               <div className="w-full flex flex-col items-center gap-5">
-                {/* Animated message area */}
                 <div className="min-h-[3.25rem] flex items-center justify-center">
                   <div
                     key={messageIndex}
@@ -288,10 +262,9 @@ export function SplashScreen({
                   </div>
                 </div>
 
-                {/* Progress steps */}
                 <div className="w-full max-w-2xl">
                   <div className="flex items-center justify-between gap-2">
-                    {["Starting", "Compressing", "Packaging"].map((label, index) => (
+                    {[t("splash.steps.starting"), t("splash.steps.compressing"), t("splash.steps.packaging")].map((label, index) => (
                       <div
                         key={label}
                         className="flex flex-col items-center text-xs uppercase tracking-[0.2em] text-gray-400"
@@ -314,16 +287,14 @@ export function SplashScreen({
                 </div>
               </div>
 
-              {/* Loader */}
               <div className="w-full max-w-2xl h-2.5 bg-white/5 rounded-full overflow-hidden relative backdrop-blur-md ring-1 ring-white/10">
                 <div className="absolute top-0 left-0 h-full w-1/2 bg-gradient-to-r from-sky-400 via-indigo-500 to-fuchsia-500 rounded-full animate-loading-bar shadow-[0_4px_18px_rgba(79,70,229,0.45)]" />
               </div>
 
-              {/* Tips & actions */}
               <div className="w-full max-w-3xl flex flex-col md:flex-row gap-4 items-start md:items-center">
                 <div className="flex-1 bg-white/5 rounded-2xl p-4 text-left text-sm text-gray-100 ring-1 ring-white/10 shadow-inner shadow-black/30 backdrop-blur-md">
                   <p className="text-[11px] uppercase tracking-[0.3em] text-blue-200 mb-1">
-                    Tip
+                    {t("splash.tipLabel")}
                   </p>
                   <p className="text-base font-medium text-white/90">{tipMessage}</p>
                 </div>
@@ -331,7 +302,7 @@ export function SplashScreen({
                   onClick={onAbort}
                   className="px-8 py-2.5 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:border-red-500/50 hover:text-red-200 text-gray-100 text-sm transition-all duration-200 backdrop-blur-md active:scale-95 outline-none focus:ring-2 focus:ring-white/20"
                 >
-                  Cancel
+                  {t("splash.cancelButton")}
                 </button>
               </div>
             </div>
